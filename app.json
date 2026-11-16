@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Amiguinho Entregas",
+    "slug": "amiguinho-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.amiguinho.entregas",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location"
+        ],
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "O aplicativo Amiguinho Entregas necessita de acesso contínuo à localização em segundo plano para rastreamento de rotas e auditoria de entregas durante o expediente.",
+        "NSLocationWhenInUseUsageDescription": "O aplicativo Amiguinho Entregas necessita de sua localização para validar o ponto exato da entrega das mercadorias."
+      }
+    },
+    "android": {
+      "package": "com.amiguinho.entregas",
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permitir que o Amiguinho Entregas acesse sua localização em segundo plano para telemetria de rota em tempo real.",
+          "locationWhenInUsePermission": "Permitir acesso à localização para certificar as entregas e blindar coordenadas de clientes.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-sqlite",
+      "expo-status-bar",
+      "expo-asset"
+    ]
+  }
+}
