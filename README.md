@@ -145,4 +145,4 @@ Para o rastreamento em segundo plano operar com máxima precisão mesmo com a te
 
 ## 📄 Licença
 
-Este projeto é de uso proprietário e exclusivo da **Distribuidora de Bebidas Amigão**. Todos os direitos reservados.
+Este projeto é de uso proprietário e exclusivo de **Leonardo Rodrigues**. Todos os direitos reservados.

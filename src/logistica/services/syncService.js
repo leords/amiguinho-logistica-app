@@ -307,7 +307,7 @@ const enviarBaixaApiPrincipal = async (baseUrl, headers, payload) => {
     let res = await fetch(urlOficial, {
       method: 'PATCH',
       headers,
-      body: JSON.stringify({}),
+      body: JSON.stringify(payload),
       signal: controller.signal
     });
 
@@ -322,7 +322,7 @@ const enviarBaixaApiPrincipal = async (baseUrl, headers, payload) => {
         res = await fetch(urlOficial, {
           method: 'PATCH',
           headers: novosHeaders,
-          body: JSON.stringify({})
+          body: JSON.stringify(payload)
         });
       }
     }
@@ -350,7 +350,12 @@ const enviarBaixaApiPrincipal = async (baseUrl, headers, payload) => {
       const fallbackRes = await fetch(fallbackUrl, {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({ status: 'concluido', dataHora: payload.dataHora })
+        body: JSON.stringify({
+          status: 'concluido',
+          dataHora: payload.dataHora,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+        })
       });
       return fallbackRes.ok || fallbackRes.status === 409;
     }

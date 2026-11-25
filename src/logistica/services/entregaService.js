@@ -97,13 +97,11 @@ export const registrarBaixaEntrega = async (pedidoId, opcoes = {}) => {
     dataHora: dataHoraIso,
     formaPagamento: pedido.formaPagamento,
     valorTotal: pedido.valorTotal,
-    ...(deveAtualizarCliente
-      ? {
-          latitude: posicao.latitude,
-          longitude: posicao.longitude,
-          gpsConfirmado: true
-        }
-      : {})
+    latitude: posicao.latitude,
+    longitude: posicao.longitude,
+    precisao: posicao.precisao,
+    atualizarGpsCliente: deveAtualizarCliente,
+    gpsConfirmado: deveAtualizarCliente
   };
 
   await sqliteService.enfileirarEvento({
