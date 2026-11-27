@@ -267,6 +267,10 @@ const sincronizarEventosTransacionais = async () => {
       if (item.tipoDestino === TIPO_DESTINO_FILA.API_PRINCIPAL_BAIXA) {
         respostaOk = await enviarBaixaApiPrincipal(apiPrincipalUrl, headers, payload);
       }
+      // 1.1 CONCLUSÃO DE CARGA NA API PRINCIPAL
+      else if (item.tipoDestino === TIPO_DESTINO_FILA.API_PRINCIPAL_CONCLUIR_CARGA) {
+        respostaOk = await enviarConcluirCargaApiPrincipal(apiPrincipalUrl, headers, payload);
+      }
       // 2. EVENTOS OPERACIONAIS PARA A API LOGÍSTICA
       else if (item.tipoDestino === TIPO_DESTINO_FILA.API_LOGISTICA_EVENTO) {
         respostaOk = await enviarEventoApiLogistica(apiLogisticaUrl, headers, payload);
@@ -358,6 +362,61 @@ const enviarBaixaApiPrincipal = async (baseUrl, headers, payload) => {
         })
       });
       return fallbackRes.ok || fallbackRes.status === 409;
+    }
+
+    return false;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+};
+
+/**
+ * Notifica a conclusão de uma carga para a API Principal (ERP Amiguinho).
+ * Rota oficial: PATCH /cargas/:id/concluir
+ */
+const enviarConcluirCargaApiPrincipal = async (baseUrl, headers, payload) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SYNC_CONFIG.TIMEOUT_REQUISICAO_MS);
+
+  const cargaId = payload.cargaId || payload.id;
+  const urlOficial = `${baseUrl}/cargas/${cargaId}/concluir`;
+
+  try {
+    let res = await fetch(urlOficial, {
+      method: 'PATCH',
+      headers,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    // Se o token expirou (401), renova silenciosamente e tenta mais uma vez
+    if (res.status === 401) {
+      console.warn('[syncService] Token expirado ao concluir carga. Renovando silenciosamente...');
+      const novoToken = await obterToken(true);
+      if (novoToken) {
+        const novosHeaders = await montarHeadersAutenticados();
+        res = await fetch(urlOficial, {
+          method: 'PATCH',
+          headers: novosHeaders
+        });
+      }
+    }
+
+    // 200 (OK) ou 400 com CARGA_JA_FINALIZADA são considerados sucesso pleno
+    if (res.ok) {
+      console.log(`[syncService] Carga #${cargaId} concluída com sucesso na API Principal.`);
+      return true;
+    }
+
+    if (res.status === 400) {
+      const errJson = await res.json().catch(() => ({}));
+      const codigoErro = errJson?.erro?.codigo || errJson?.codigo;
+      if (codigoErro === 'CARGA_JA_FINALIZADA') {
+        console.warn(`[syncService] Carga #${cargaId} já se encontrava finalizada na API Principal.`);
+        return true;
+      }
     }
 
     return false;

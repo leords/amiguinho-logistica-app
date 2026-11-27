@@ -4,13 +4,21 @@ import {
   montarHeadersAutenticados,
   obterVeiculoVinculado,
   salvarMotoristaAtual,
-  obterToken
+  obterToken,
+  salvarCargaAtiva,
+  limparCargaAtiva
 } from '../config/apiConfig';
 import * as sqliteService from '../database/sqliteService';
+import {
+  obterDataHojeIsoBrasil,
+  obterDataHojeFormatadaPtBr,
+  ehDataDeHoje
+} from '../utils/date';
 
 /**
- * Baixa a carga de pedidos ativa ('rota' ou 'pendente') vinculada ao veículo configurado no dispositivo.
- * Endpoint oficial: GET ${API_PRINCIPAL_URL}/cargas?veiculoId=${veiculoId}
+ * Baixa a carga de pedidos ativa ('rota') vinculada ao veículo configurado no dispositivo,
+ * filtrando estritamente pela data do dia atual (não busca nem exibe cargas de dias anteriores).
+ * Endpoint oficial: GET ${API_PRINCIPAL_URL}/cargas?veiculoId=${veiculoId}&status=rota&dataInicio=${hoje}&dataFim=${hoje}
  */
 export const baixarCargaDoDia = async () => {
   const baseUrl = getApiPrincipalUrl();
@@ -21,9 +29,11 @@ export const baixarCargaDoDia = async () => {
   }
 
   const veiculoId = veiculo.id;
-  const url = `${baseUrl}/cargas?veiculoId=${veiculoId}&status=rota`;
+  const hoje = obterDataHojeIsoBrasil();
+  const dataFormatadaDia = obterDataHojeFormatadaPtBr();
+  const url = `${baseUrl}/cargas?veiculoId=${veiculoId}&status=rota&dataInicio=${hoje}&dataFim=${hoje}`;
 
-  console.log(`[cargaService] Consultando rota despachada para o Veículo ID ${veiculoId} (${veiculo.nome || veiculo.placa}): ${url}`);
+  console.log(`[cargaService] Consultando rota despachada de hoje (${dataFormatadaDia}) para o Veículo ID ${veiculoId} (${veiculo.nome || veiculo.placa}): ${url}`);
 
   let resposta = null;
   let headers = await montarHeadersAutenticados();
@@ -53,31 +63,38 @@ export const baixarCargaDoDia = async () => {
   const listaCargas = Array.isArray(json) ? json : (json.resultado || json.cargas || []);
 
   if (!listaCargas || listaCargas.length === 0) {
+    // Se a jornada não está em andamento, limpa os pedidos locais para não exibir resquícios de outros dias
+    const jornadaAtiva = await sqliteService.obterJornadaAtiva();
+    if (!jornadaAtiva) {
+      await sqliteService.limparCargaPedidos().catch(() => {});
+      await limparCargaAtiva().catch(() => {});
+    }
+
     return {
       sucesso: false,
       total: 0,
-      mensagem: `Nenhuma carga foi encontrada no servidor para o veículo ${veiculo.nome || veiculo.placa}.`
+      mensagem: `Nenhuma carga despachada para hoje (${dataFormatadaDia}) foi encontrada para o veículo ${veiculo.nome || veiculo.placa}.`
     };
   }
 
-  // Filtra estritamente cargas despachadas com status 'rota'
+  // Filtra estritamente cargas despachadas com status 'rota' pertencentes ao dia de hoje
   const cargasEmRota = listaCargas.filter((c) => {
     const st = String(c.status || '').toLowerCase();
-    return st === 'rota';
+    if (st !== 'rota') return false;
+    // Dupla blindagem: confere se a data da carga é de hoje
+    if (c.data && !ehDataDeHoje(c.data)) return false;
+    return true;
   });
 
   if (cargasEmRota.length === 0) {
-    // Se a jornada não está em andamento, limpa os pedidos locais para não exibir cargas pendentes
+    // Se a jornada não está em andamento, limpa os pedidos locais para não exibir cargas de outros dias
     const jornadaAtiva = await sqliteService.obterJornadaAtiva();
     if (!jornadaAtiva) {
-      await sqliteService.limparCargaPedidos();
+      await sqliteService.limparCargaPedidos().catch(() => {});
+      await limparCargaAtiva().catch(() => {});
     }
 
-    const temPendente = listaCargas.some((c) => String(c.status || '').toLowerCase() === 'pendente');
-    const mensagem = temPendente
-      ? `A carga deste veículo ainda não foi despachada pelo administrador (status atual: 'pendente'). Aguarde a liberação para iniciar a rota.`
-      : `Nenhuma carga com status 'rota' foi encontrada para o veículo ${veiculo.nome || veiculo.placa}. Aguarde o administrador despachar a rota.`;
-
+    const mensagem = `Nenhuma carga em rota encontrada para hoje (${dataFormatadaDia}) no veículo ${veiculo.nome || veiculo.placa}. Aguarde a liberação do administrador.`;
     console.log(`[cargaService] ${mensagem}`);
 
     return {
@@ -137,6 +154,14 @@ export const baixarCargaDoDia = async () => {
   // 3. Limpa pedidos anteriores para não misturar cargas antigas e grava os novos no SQLite local
   await sqliteService.limparCargaPedidos();
   const inseridos = await sqliteService.salvarCargaPedidos(pedidosNormalizados);
+
+  // 4. Salva metadados da carga ativa para auditoria e controle de ciclo de vida
+  await salvarCargaAtiva({
+    id: cargaAtiva.id,
+    data: cargaAtiva.data,
+    status: cargaAtiva.status,
+    totalPedidos: inseridos
+  }).catch(() => {});
 
   console.log(`[cargaService] Carga #${cargaAtiva.id} (${cargaAtiva.status}) persistida no SQLite local com ${inseridos} pedidos.`);
 

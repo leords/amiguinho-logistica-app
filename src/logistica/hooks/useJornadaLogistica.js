@@ -57,8 +57,26 @@ export const useJornadaLogistica = () => {
   }, [filtroStatus]);
 
   useEffect(() => {
-    sqliteService.inicializarBanco().then(() => {
-      recarregarDados();
+    sqliteService.inicializarBanco().then(async () => {
+      // 1. Valida e encerra qualquer jornada remanescente de datas anteriores
+      await jornadaService.validarELimparJornadasAntigas().catch(() => {});
+      await recarregarDados();
+
+      // 2. Se houver caminhão vinculado e não houver jornada ativa,
+      // busca automaticamente no servidor se a rota de hoje já está despachada ('rota')
+      try {
+        const statusJ = await jornadaService.obterStatusJornada();
+        if (!statusJ.emAndamento) {
+          const v = await obterVeiculoVinculado();
+          if (v && v.id) {
+            await cargaService.baixarCargaDoDia().catch(() => null);
+            await recarregarDados();
+          }
+        }
+      } catch (e) {
+        console.log('[useJornadaLogistica] Busca automática de carga do dia:', e.message);
+      }
+
       dispararSincronizacaoSeConectado();
     });
   }, [recarregarDados]);

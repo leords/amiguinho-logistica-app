@@ -198,11 +198,40 @@ export const desvincularVeiculo = async () => {
     '@amiguinho:veiculo',
     '@amiguinho:veiculo_id',
     '@amiguinho:motorista_atual',
+    '@amiguinho:carga_ativa',
     '@amiguinho:token',
     '@amiguinho:refreshToken',
     '@amiguinho:credenciais',
     'token'
   ]);
+};
+
+/**
+ * Obtém os metadados da carga ativa no dispositivo.
+ */
+export const obterCargaAtiva = async () => {
+  try {
+    const json = await AsyncStorage.getItem('@amiguinho:carga_ativa');
+    return json ? JSON.parse(json) : null;
+  } catch (_) {
+    return null;
+  }
+};
+
+/**
+ * Salva os metadados da carga ativa no dispositivo.
+ */
+export const salvarCargaAtiva = async (dadosCarga) => {
+  if (dadosCarga) {
+    await AsyncStorage.setItem('@amiguinho:carga_ativa', JSON.stringify(dadosCarga));
+  }
+};
+
+/**
+ * Limpa os dados da carga ativa do armazenamento.
+ */
+export const limparCargaAtiva = async () => {
+  await AsyncStorage.removeItem('@amiguinho:carga_ativa').catch(() => {});
 };
 
 /**
